@@ -1,6 +1,6 @@
 const Alexa = require('ask-sdk-core');
-const ytlist = require('yt-list');
-const ytdl = require('ytdl-core');
+const yts = require('yt-search');
+const ytdl = require('@distube/ytdl-core');
 require('dotenv').config();
 
 const LaunchRequestHandler = {
@@ -42,15 +42,20 @@ const PlaySongIntentHandler = {
 const controller = {
     async search(handlerInput, query) {
         const data = await searchForVideos(query);
-        return this.play(handlerInput, data.items[0]);
+        if (!data || !data.videos || data.videos.length === 0) {
+            return handlerInput.responseBuilder
+                .speak("I couldn't find any songs for that query.")
+                .getResponse();
+        }
+        return this.play(handlerInput, data.videos[0]);
     },
     async play(handlerInput, audioInfo) {
         const { responseBuilder } = handlerInput;
         const playBehavior = "REPLACE_ALL";
-        const id= audioInfo.id.videoId;
+        const id = audioInfo.videoId;
         const audioFormat = await getAudioUrl(id);
         responseBuilder
-            .speak(`Playing  ${audioInfo.snippet.title}`)
+            .speak(`Playing  ${audioInfo.title}`)
             .withShouldEndSession(true)
             .addAudioPlayerPlayDirective(
                 playBehavior,
@@ -69,13 +74,13 @@ const controller = {
     },
 };
 
-const searchForVideos = async (searchQuery, nextPageToken, amount) => {
-    return await ytlist.searchVideos(searchQuery, nextPageToken, amount);
+const searchForVideos = async (searchQuery) => {
+    return await yts(searchQuery);
 }
 
 const getAudioUrl = async (videoId) => {
-    const audioInfo = await ytdl.getInfo(videoId, {});
-    const audioFormat = await ytdl.chooseFormat(audioInfo.formats, {
+    const audioInfo = await ytdl.getInfo(videoId);
+    const audioFormat = ytdl.chooseFormat(audioInfo.formats, {
         quality: "highestaudio",
     });
     return audioFormat;
